@@ -366,16 +366,20 @@ class UploadHandler
             $file->error = $this->get_error_message($error);
             return false;
         }
+        if (!preg_match('/\.[^.]+$/', $file->name)) {
+            $file->error = "File must have an extension (.mp3, .pdf, .doc, .docx)";
+            return false;
+        }
+        if (!preg_match($this->options['accept_file_types'], $file->name)) {
+            $file->error = $this->get_error_message('accept_file_types');
+            return false;
+        }
         $content_length = $this->fix_integer_overflow(
             (int)$this->get_server_var('CONTENT_LENGTH')
         );
         $post_max_size = $this->get_config_bytes(ini_get('post_max_size'));
         if ($post_max_size && ($content_length > $post_max_size)) {
             $file->error = $this->get_error_message('post_max_size');
-            return false;
-        }
-        if (!preg_match($this->options['accept_file_types'], $file->name)) {
-            $file->error = $this->get_error_message('accept_file_types');
             return false;
         }
         if ($uploaded_file && is_uploaded_file($uploaded_file)) {
@@ -397,7 +401,6 @@ class UploadHandler
         }
         if (is_int($this->options['max_number_of_files']) &&
                 ($this->count_file_objects() >= $this->options['max_number_of_files']) &&
-                // Ignore additional chunks of existing files:
                 !is_file($this->get_upload_path($file->name))) {
             $file->error = $this->get_error_message('max_number_of_files');
             return false;
@@ -409,21 +412,17 @@ class UploadHandler
         if (($max_width || $max_height || $min_width || $min_height)
            && preg_match($this->options['image_file_types'], $file->name)) {
             list($img_width, $img_height) = $this->get_image_size($uploaded_file);
-
-            // If we are auto rotating the image by default, do the checks on
-            // the correct orientation
             if (
                 @$this->options['image_versions']['']['auto_orient'] &&
                 function_exists('exif_read_data') &&
                 ($exif = @exif_read_data($uploaded_file)) &&
                 (((int) @$exif['Orientation']) >= 5 )
             ) {
-              $tmp = $img_width;
-              $img_width = $img_height;
-              $img_height = $tmp;
-              unset($tmp);
+                $tmp = $img_width;
+                $img_width = $img_height;
+                $img_height = $tmp;
+                unset($tmp);
             }
-
         }
         if (!empty($img_width)) {
             if ($max_width && $img_width > $max_width) {
